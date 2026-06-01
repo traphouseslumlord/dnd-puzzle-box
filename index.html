@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Torn Map</title>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400&family=Crimson+Text:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#c8922a;--gold-bright:#f0c050;--green:#50dd20;--text:#bfaa80;--text-dim:#665840}
+body{background:#050402;min-height:100vh;font-family:'Crimson Text',Georgia,serif;color:var(--text);overflow:hidden;touch-action:none}
+#cv{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;touch-action:none}
+#ti{position:absolute;left:12%;top:10%;width:76%;height:80%;object-fit:fill;pointer-events:none;z-index:1}
+.hdr{position:absolute;top:0;left:0;right:0;z-index:20;text-align:center;padding:6px 12px 4px;background:linear-gradient(180deg,rgba(3,2,1,.92),transparent);pointer-events:none}
+.ht{font-family:'UnifrakturMaguntia',cursive;font-size:clamp(1.2rem,4vw,2rem);color:var(--gold);text-shadow:0 0 16px rgba(200,146,42,.5);line-height:1}
+.hs{font-size:.75rem;font-style:italic;color:var(--text-dim);margin-top:2px}
+.hc{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.15em;color:var(--text-dim);text-transform:uppercase;margin-top:3px}
+.hc span{color:var(--green)}
+.sync-dot{position:absolute;top:8px;right:12px;width:8px;height:8px;border-radius:50%;background:#555;z-index:30;transition:background .3s}
+.sync-dot.synced{background:var(--green)}
+.sync-dot.syncing{background:var(--gold)}
+.mp{position:absolute;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;filter:drop-shadow(0 3px 10px rgba(0,0,0,.9));z-index:10}
+.mp:active{cursor:grabbing}
+.mp.dr{filter:drop-shadow(0 6px 18px rgba(0,0,0,.95));z-index:200}
+.mp.lk{cursor:default;pointer-events:none;z-index:5;filter:drop-shadow(0 1px 4px rgba(0,0,0,.7))}
+.mp img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
+.sz{position:absolute;pointer-events:none;z-index:2}
+@keyframes sa{0%{filter:drop-shadow(0 0 8px rgba(60,200,20,.6))}100%{filter:drop-shadow(0 1px 4px rgba(0,0,0,.7))}}
+.mp.sa{animation:sa .4s ease-out forwards}
+.rb{position:absolute;bottom:10px;right:12px;z-index:30;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;padding:6px 14px;background:rgba(6,5,4,.9);border:1px solid #3a3020;color:var(--text-dim);cursor:pointer}
+.rb:hover{border-color:var(--gold);color:var(--gold)}
+.vo{display:none;position:fixed;inset:0;background:rgba(3,2,1,.97);align-items:center;justify-content:center;z-index:100}
+.vo.show{display:flex;animation:fi .5s ease}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.vb{text-align:center;max-width:600px;padding:24px 20px;animation:ru .6s ease}
+@keyframes ru{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.vt{font-family:'UnifrakturMaguntia',cursive;font-size:clamp(2rem,7vw,3rem);color:var(--gold-bright);text-shadow:0 0 30px rgba(200,146,42,.7);margin-bottom:12px}
+.vm{width:100%;max-width:520px;border:2px solid var(--gold);margin:16px auto;display:block;box-shadow:0 0 30px rgba(200,146,42,.4)}
+.vf{font-style:italic;color:var(--text-dim);font-size:1rem;line-height:1.75;margin-bottom:20px}
+.vcb{font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;padding:10px 26px;background:transparent;border:1px solid var(--gold);color:var(--gold);cursor:pointer}
+</style>
+</head>
+<body>
+<div id="cv">
+  <img id="ti" src="https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/table.jpg" alt="Table">
+  <div class="hdr">
+    <div class="ht">The Torn Map</div>
+    <div class="hs">Not all pieces belong. Piece it together.</div>
+    <div class="hc">Locked: <span id="sc">0</span> / 23</div>
+  </div>
+  <div class="sync-dot" id="sd"></div>
+  <button class="rb" onclick="resetTable()">Reset Table</button>
+</div>
+<div class="vo" id="vic">
+  <div class="vb">
+    <div class="vt">The Map Revealed</div>
+    <img class="vm" src="https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_full.jpg" alt="Map">
+    <p class="vf">The pieces align. Barovia spreads before you.<br><em>Now you know where you must go.</em></p>
+    <button class="vcb" onclick="document.getElementById('vic').classList.remove('show')">Continue</button>
+  </div>
+</div>
+<script type="module">
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const supabase = createClient('https://fxygrfodcuwajcidkvus.supabase.co','sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM');
+const SNAP = 0.13;
+const TOTAL = 23;
+const PIECES = [
+  {id:'barovia_0',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_0.png',pw:508,ph:488,tx:0.4233,ty:0.5249,tw:0.3508,th:0.4494},
+  {id:'barovia_1',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_1.png',pw:344,ph:465,tx:0.7465,ty:0.0157,tw:0.2376,th:0.4282},
+  {id:'barovia_2',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_2.png',pw:489,ph:308,tx:0.4392,ty:0.2762,tw:0.3377,th:0.2836},
+  {id:'barovia_3',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_3.png',pw:297,ph:500,tx:0.7797,ty:0.5129,tw:0.2051,th:0.4604},
+  {id:'barovia_4',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_4.png',pw:408,ph:333,tx:0.0138,ty:0.4816,tw:0.2818,th:0.3066},
+  {id:'barovia_5',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_5.png',pw:384,ph:349,tx:0.0145,ty:0.2256,tw:0.2652,th:0.3214},
+  {id:'barovia_6',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_6.png',pw:306,ph:420,tx:0.3073,ty:0.0083,tw:0.2113,th:0.3867},
+  {id:'barovia_7',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_7.png',pw:400,ph:278,tx:0.2023,ty:0.7155,tw:0.2762,th:0.2560},
+  {id:'barovia_8',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_8.png',pw:293,ph:303,tx:0.0166,ty:0.0074,tw:0.2023,th:0.2790},
+  {id:'barovia_9',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_9.png',pw:282,ph:333,tx:0.4558,ty:0.0055,tw:0.1948,th:0.3066},
+  {id:'barovia_10',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_10.png',pw:303,ph:224,tx:0.0145,ty:0.7661,tw:0.2093,th:0.2063},
+  {id:'barovia_11',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_11.png',pw:261,ph:392,tx:0.1685,ty:0.0055,tw:0.1802,th:0.3610},
+  {id:'barovia_12',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_12.png',pw:210,ph:343,tx:0.2272,ty:0.2311,tw:0.1450,th:0.3158},
+  {id:'barovia_13',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_13.png',pw:218,ph:276,tx:0.2797,ty:0.5414,tw:0.1506,th:0.2541},
+  {id:'barovia_14',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_14.png',pw:164,ph:342,tx:0.6789,ty:0.0129,tw:0.1133,th:0.3149},
+  {id:'barovia_15',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_15.png',pw:262,ph:226,tx:0.7624,ty:0.3831,tw:0.1809,th:0.2081},
+  {id:'barovia_16',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_16.png',pw:169,ph:303,tx:0.7314,ty:0.5599,tw:0.1167,th:0.2790},
+  {id:'barovia_17',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_17.png',pw:169,ph:186,tx:0.3439,ty:0.3812,tw:0.1167,th:0.1713},
+  {id:'barovia_18',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_18.png',pw:169,ph:186,tx:0.4123,ty:0.5239,tw:0.1167,th:0.1713},
+  {id:'barovia_19',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_19.png',pw:137,ph:160,tx:0.6878,ty:0.8232,tw:0.0946,th:0.1473},
+  {id:'barovia_20',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_20.png',pw:120,ph:190,tx:0.6326,ty:0.0101,tw:0.0829,th:0.1750},
+  {id:'barovia_21',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_21.png',pw:131,ph:129,tx:0.6008,ty:0.1676,tw:0.0905,th:0.1188},
+  {id:'barovia_22',real:true,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/barovia_22.png',pw:129,ph:126,tx:0.8936,ty:0.3969,tw:0.0891,th:0.1160},
+  {id:'ereth_0',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_0.png',pw:460,ph:301,tx:0.6805,ty:0.7105,tw:0.3181,th:0.2767},
+  {id:'ereth_1',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_1.png',pw:390,ph:333,tx:0.7289,ty:0.0000,tw:0.2697,th:0.3061},
+  {id:'ereth_2',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_2.png',pw:360,ph:380,tx:0.0000,ty:0.0009,tw:0.2490,th:0.3493},
+  {id:'ereth_3',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_3.png',pw:391,ph:328,tx:0.7296,ty:0.4752,tw:0.2704,th:0.3015},
+  {id:'ereth_4',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_4.png',pw:403,ph:284,tx:0.0000,ty:0.2978,tw:0.2787,th:0.2610},
+  {id:'ereth_5',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_5.png',pw:432,ph:263,tx:0.7012,ty:0.2665,tw:0.2988,th:0.2417},
+  {id:'ereth_6',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_6.png',pw:336,ph:372,tx:0.4876,ty:0.6443,tw:0.2324,th:0.3419},
+  {id:'ereth_7',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_7.png',pw:450,ph:235,tx:0.2192,ty:0.2307,tw:0.3112,th:0.2160},
+  {id:'ereth_8',real:false,src:'https://fxygrfodcuwajcidkvus.supabase.co/storage/v1/object/public/puzzle-pieces/ereth_8.png',pw:433,ph:234,tx:0.2911,ty:0.7748,tw:0.2994,th:0.2151}
+];
+
+let zTop=10, locked_ids=new Set(), myDragging=null, ch=null;
+
+const shuffle = a=>{ for(let i=a.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]; }return a; };
+const tr = ()=>document.getElementById('ti').getBoundingClientRect();
+const dot = s=>document.getElementById('sd').className='sync-dot'+(s?' '+s:'');
+const count = ()=>{ document.getElementById('sc').textContent=locked_ids.size; if(locked_ids.size>=TOTAL)setTimeout(()=>document.getElementById('vic').classList.add('show'),600); };
+
+async function sbGet(){ try{ const r=await fetch(`https://fxygrfodcuwajcidkvus.supabase.co/rest/v1/piece_positions?select=*`,{headers:{'apikey':'sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM','Authorization':'Bearer sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM'}});return r.ok?r.json():[];}catch(e){return[];} }
+async function sbSet(row){ try{ await fetch(`https://fxygrfodcuwajcidkvus.supabase.co/rest/v1/piece_positions`,{method:'POST',headers:{'apikey':'sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM','Authorization':'Bearer sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM','Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},body:JSON.stringify(row)});}catch(e){} }
+async function sbClear(){ try{ await fetch(`https://fxygrfodcuwajcidkvus.supabase.co/rest/v1/piece_positions?id=neq.null`,{method:'DELETE',headers:{'apikey':'sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM','Authorization':'Bearer sb_publishable_GchPRO3iDe3oEWz0T3f1cw_ziJ_nZQM'}});}catch(e){} }
+
+async function build(){
+  const cv=document.getElementById('cv');
+  cv.querySelectorAll('.mp,.sz').forEach(e=>e.remove());
+  locked_ids=new Set();
+  document.getElementById('sc').textContent=0;
+  const t=document.getElementById('ti');
+  if(!t.complete) await new Promise(r=>{ t.onload=r; });
+  const R=tr(), vw=window.innerWidth, vh=window.innerHeight;
+  const mw=R.width*0.17;
+
+  PIECES.filter(p=>p.real).forEach(p=>{
+    const z=document.createElement('div');
+    z.className='sz'; z.id='sz-'+p.id;
+    z.style.cssText=`left:${R.left+p.tx*R.width}px;top:${R.top+p.ty*R.height}px;width:${p.tw*R.width}px;height:${p.th*R.height}px;`;
+    cv.appendChild(z);
+  });
+
+  dot('syncing');
+  const rows=await sbGet();
+  const smap={};rows.forEach(r=>smap[r.id]=r);
+
+  const sides=shuffle([...PIECES]).map((p,i)=>{return{p,side:i%4}});
+  sides.forEach(item=>{
+    const p=item.p;
+    const sc=mw/p.pw;
+    const pw=Math.round(p.pw*sc), ph=Math.round(p.ph*sc);
+    const si=sides.filter(s=>s.side===item.side);
+    const sx=si.indexOf(item), sn=si.length;
+    const mg=8, jt=()=>(Math.random()-.5)*18;
+    let x,y;
+    if(item.side===0){ x=(vw/(sn+1))*(sx+1)-pw/2+jt(); y=Math.max(mg,R.top-ph-8-Math.random()*18); }
+    else if(item.side===1){ x=Math.min(vw-pw-mg,R.right+6+Math.random()*14); y=(vh/(sn+1))*(sx+1)-ph/2+jt(); }
+    else if(item.side===2){ x=(vw/(sn+1))*(sx+1)-pw/2+jt(); y=Math.min(vh-ph-mg,R.bottom+6+Math.random()*14); }
+    else{ x=Math.max(mg,R.left-pw-6-Math.random()*14); y=(vh/(sn+1))*(sx+1)-ph/2+jt(); }
+    x=Math.max(mg,Math.min(vw-pw-mg,x)); y=Math.max(mg,Math.min(vh-ph-mg,y));
+    const srv=smap[p.id];
+    if(srv){ x=srv.x; y=srv.y; }
+    const el=document.createElement('div');
+    el.className='mp'; el.id='el-'+p.id; el.dataset.id=p.id; el.dataset.real=p.real;
+    el.style.cssText=`width:${pw}px;height:${ph}px;left:${x}px;top:${y}px;z-index:${++zTop};`;
+    const img=document.createElement('img');
+    img.src=p.src; img.loading='lazy'; img.alt='';
+    el.appendChild(img);
+    cv.appendChild(el);
+    if(srv&&srv.locked&&p.real){ snap(el,p,false); }
+    else{ drag(el); }
+  });
+  dot('synced');
+  realtime();
+}
+
+function drag(el){
+  let sx,sy,sl,st,on=false;
+  const gp=e=>e.touches?{x:e.touches[0].clientX,y:e.touches[0].clientY}:{x:e.clientX,y:e.clientY};
+  el.addEventListener('mousedown',start); el.addEventListener('touchstart',start,{passive:false});
+  function start(e){
+    if(el.classList.contains('lk')) return;
+    e.preventDefault(); on=true; myDragging=el.dataset.id;
+    const p=gp(e); sx=p.x; sy=p.y; sl=el.offsetLeft; st=el.offsetTop;
+    el.classList.add('dr'); el.style.zIndex=++zTop;
+    document.addEventListener('mousemove',move,{passive:false});
+    document.addEventListener('touchmove',move,{passive:false});
+    document.addEventListener('mouseup',end); document.addEventListener('touchend',end);
+  }
+  function move(e){
+    if(!on) return; e.preventDefault();
+    const p=gp(e);
+    el.style.left=Math.max(0,sl+(p.x-sx))+'px';
+    el.style.top=Math.max(0,st+(p.y-sy))+'px';
+  }
+  async function end(){
+    if(!on) return; on=false; myDragging=null; el.classList.remove('dr');
+    let snapped=false;
+    if(el.dataset.real==='true'){
+      const piece=PIECES.find(p=>p.id===el.dataset.id);
+      snapped=trySnap(el,piece);
+    }
+    const er=el.getBoundingClientRect();
+    const mv={id:el.dataset.id,x:el.offsetLeft,y:el.offsetTop,width:er.width,height:er.height,locked:snapped};
+    dot('syncing');
+    await sbSet(mv);
+    if(ch) ch.send({type:'broadcast',event:'mv',payload:mv});
+    dot('synced');
+    document.removeEventListener('mousemove',move); document.removeEventListener('touchmove',move);
+    document.removeEventListener('mouseup',end); document.removeEventListener('touchend',end);
+  }
+}
+
+function trySnap(el,piece){
+  if(!piece||!piece.real) return false;
+  if(locked_ids.has(piece.id)) return true;
+  const R=tr(), sd=R.width*SNAP;
+  const tx=R.left+piece.tx*R.width, ty=R.top+piece.ty*R.height;
+  const tw=piece.tw*R.width, th=piece.th*R.height;
+  const er=el.getBoundingClientRect();
+  const pcx=er.left+er.width/2, pcy=er.top+er.height/2;
+  const dist=Math.hypot(pcx-(tx+tw/2), pcy-(ty+th/2));
+  if(dist<sd){ snap(el,piece,true); return true; }
+  return false;
+}
+
+function snap(el,piece,animate){
+  if(locked_ids.has(piece.id)) return;
+  locked_ids.add(piece.id);
+  const R=tr();
+  const tx=R.left+piece.tx*R.width, ty=R.top+piece.ty*R.height;
+  const tw=piece.tw*R.width, th=piece.th*R.height;
+  el.style.left=tx+'px'; el.style.top=ty+'px';
+  el.style.width=tw+'px'; el.style.height=th+'px';
+  el.classList.add('lk'); if(animate) el.classList.add('sa');
+  el.style.zIndex=5;
+  count();
+}
+
+function realtime(){
+  ch=supabase.channel('puzzle:v2',{config:{broadcast:{self:false}}});
+  ch.on('broadcast',{event:'mv'},(msg)=>{
+    const d=msg.payload;
+    if(d.id===myDragging) return;
+    const el=document.getElementById('el-'+d.id);
+    if(!el) return;
+    if(d.locked&&!locked_ids.has(d.id)){
+      const p=PIECES.find(x=>x.id===d.id);
+      if(p&&p.real) snap(el,p,true);
+    } else if(!el.classList.contains('lk')){
+      el.style.left=d.x+'px'; el.style.top=d.y+'px';
+    }
+  });
+  ch.subscribe(s=>{ if(s==='SUBSCRIBED') dot('synced'); });
+}
+
+async function resetTable(){
+  if(!confirm('Reset table for everyone?')) return;
+  if(ch) await supabase.removeChannel(ch);
+  dot('syncing'); await sbClear(); build();
+}
+window.resetTable=resetTable;
+build();
+window.addEventListener('resize',build);
+
+</script>
+</body>
+</html>
